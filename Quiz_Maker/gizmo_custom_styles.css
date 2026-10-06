@@ -1,0 +1,53 @@
+/* STREAMING_CHUNK:Defining modern dark mode base and custom touch styling */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #090d16;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* Form text areas and inputs should allow text selection */
+input, textarea {
+  user-select: text;
+}
+
+/* Touch Targets: minimum 48px height constraints for physical phones */
+.touch-target {
+  min-height: 48px;
+}
+
+/* Card choices hover & tap animations */
+.option-choice-tile {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.option-choice-tile:active {
+  transform: scale(0.985);
+}
+
+/* Custom scrollbar for desktop and tablet users */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

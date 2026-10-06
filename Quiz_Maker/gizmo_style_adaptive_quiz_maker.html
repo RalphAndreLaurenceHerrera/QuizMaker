@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GizmoAdaptive - Spaced Repetition Quiz Engine</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Tone.js for optional tactile sound feedback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              850: '#151f33',
+              900: '#0F172A',
+              950: '#090d16'
+            },
+            gizmo: {
+              primary: '#6366F1',
+              accent: '#10B981',
+              danger: '#F43F5E',
+              card: '#1E293B'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Mobile-first touch improvements and micro-animations */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, textarea {
+      user-select: text;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.96) translateY(6px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .animate-pop {
+      animation: popIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .touch-target {
+      min-height: 48px;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden">
+
+  <header class="w-full bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-3">
+    <div class="max-w-md sm:max-w-2xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <i data-lucide="brain-circuit" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
+            Gizmo<span class="text-emerald-400">Adaptive</span>
+          </h1>
+          <p class="text-[10px] text-slate-400 font-medium leading-none">Spaced Repetition Engine</p>
+        </div>
+      </div>
+
+      <!-- Quick reset/demo button -->
+      <div class="flex items-center gap-2">
+        <button id="btnAudioToggle" class="p-2 text-slate-400 hover:text-slate-200 bg-slate-800/80 rounded-xl border border-slate-700/60 transition active:scale-95 touch-target flex items-center justify-center w-10 h-10" title="Toggle Sound">
+          <i data-lucide="volume-2" class="w-4 h-4"></i>
+        </button>
+        <button id="btnDocsModal" class="p-2 text-slate-400 hover:text-indigo-400 bg-slate-800/80 rounded-xl border border-slate-700/60 transition active:scale-95 touch-target flex items-center justify-center w-10 h-10" title="Repo Files & Docs">
+          <i data-lucide="code" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-md sm:max-w-2xl mx-auto px-4 sm:px-6 pt-4 pb-24 sm:pb-8 flex flex-col">
+
+    <!-- VIEW 1: DASHBOARD VIEW -->
+    <section id="viewDashboard" class="flex-1 flex flex-col space-y-5 animate-pop">
+      <!-- Welcome Hero Banner -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-850 border border-slate-800 p-5 rounded-2xl shadow-xl relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Leitner Algorithm Active
+            </span>
+            <h2 class="text-xl sm:text-2xl font-black text-white">Daily Memory Sprint</h2>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1 max-w-[280px] sm:max-w-none">
+              Cards in lower boxes appear up to 4× more often until mastered into Box 5.
+            </p>
+          </div>
+          <div class="text-right">
+            <span class="text-3xl sm:text-4xl font-black text-indigo-400 tracking-tight" id="dashTotalCards">0</span>
+            <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Total Pool</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leitner Tier Distribution Cards -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between text-xs font-semibold px-1 text-slate-400">
+          <span>BOX PROGRESSION TIERS</span>
+          <span id="masteryRateLabel" class="text-emerald-400 font-bold">0% Mastered</span>
+        </div>
+        
+        <div class="grid grid-cols-5 gap-1.5 sm:gap-2">
+          <!-- Box 1 -->
+          <div class="bg-slate-900/90 border border-rose-500/30 rounded-xl p-2.5 sm:p-3 text-center transition hover:border-rose-500">
+            <span class="text-[10px] sm:text-xs font-bold text-rose-400 block mb-0.5">Box 1</span>
+            <span id="tierCount1" class="text-lg sm:text-xl font-black text-white">0</span>
+            <span class="block text-[9px] text-slate-400 mt-0.5">Weight 4×</span>
+          </div>
+          <!-- Box 2 -->
+          <div class="bg-slate-900/90 border border-amber-500/30 rounded-xl p-2.5 sm:p-3 text-center transition hover:border-amber-500">
+            <span class="text-[10px] sm:text-xs font-bold text-amber-400 block mb-0.5">Box 2</span>
+            <span id="tierCount2" class="text-lg sm:text-xl font-black text-white">0</span>
+            <span class="block text-[9px] text-slate-400 mt-0.5">Weight 2×</span>
+          </div>
+          <!-- Box 3 -->
+          <div class="bg-slate-900/90 border border-indigo-500/30 rounded-xl p-2.5 sm:p-3 text-center transition hover:border-indigo-500">
+            <span class="text-[10px] sm:text-xs font-bold text-indigo-400 block mb-0.5">Box 3</span>
+            <span id="tierCount3" class="text-lg sm:text-xl font-black text-white">0</span>
+            <span class="block text-[9px] text-slate-400 mt-0.5">Weight 1×</span>
+          </div>
+          <!-- Box 4 -->
+          <div class="bg-slate-900/90 border border-teal-500/30 rounded-xl p-2.5 sm:p-3 text-center transition hover:border-teal-500">
+            <span class="text-[10px] sm:text-xs font-bold text-teal-400 block mb-0.5">Box 4</span>
+            <span id="tierCount4" class="text-lg sm:text-xl font-black text-white">0</span>
+            <span class="block text-[9px] text-slate-400 mt-0.5">Weight 1×</span>
+          </div>
+          <!-- Box 5 (Mastered) -->
+          <div class="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 text-center transition hover:border-emerald-500">
+            <span class="text-[10px] sm:text-xs font-bold text-emerald-400 block mb-0.5">Box 5</span>
+            <span id="tierCount5" class="text-lg sm:text-xl font-black text-white">0</span>
+            <span class="block text-[9px] text-emerald-500 font-semibold mt-0.5">Mastered</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+        <label for="inputSessionLength" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+          Target Session Questions
+        </label>
+        
+        <div class="flex items-center gap-3">
+          <div class="relative flex-1">
+            <input 
+              id="inputSessionLength" 
+              type="text" 
+              inputmode="numeric" 
+              pattern="[0-9]*" 
+              value="5" 
+              class="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-4 py-3 text-lg font-bold text-white tracking-wide transition outline-none touch-target"
+            />
+            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">cards</span>
+          </div>
+
+          <div class="flex gap-1.5">
+            <button type="button" class="btn-preset-len px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold rounded-xl border border-slate-700 touch-target" data-len="5">5</button>
+            <button type="button" class="btn-preset-len px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold rounded-xl border border-slate-700 touch-target" data-len="10">10</button>
+            <button type="button" class="btn-preset-len px-3 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold rounded-xl border border-slate-700 touch-target" data-len="20">All</button>
+          </div>
+        </div>
+
+        <button 
+          id="btnStartSession" 
+          class="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-500 hover:from-indigo-500 hover:to-emerald-400 text-white font-extrabold text-base py-3.5 px-6 rounded-xl shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition flex items-center justify-center gap-2 touch-target"
+        >
+          <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+          <span>Start Adaptive Session</span>
+        </button>
+      </div>
+
+      <!-- Quick Tips Card -->
+      <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 text-amber-400">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Questions you miss drop straight back to <strong>Box 1</strong>. Mastered items advance to <strong>Box 5</strong> and appear less frequently to save study time.
+        </p>
+      </div>
+    </section>
+
+    <section id="viewQuizTake" class="hidden flex-1 flex flex-col animate-pop">
+      <!-- Session Progress & Exit Bar -->
+      <div class="flex items-center justify-between mb-3">
+        <button id="btnExitSession" class="text-xs font-semibold text-slate-400 hover:text-rose-400 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 transition active:scale-95 touch-target">
+          <i data-lucide="x" class="w-4 h-4"></i>
+          <span>Quit</span>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <span id="quizBadgeBox" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-indigo-500/30">
+            Box 1
+          </span>
+          <span id="quizCardCounter" class="text-xs font-bold text-slate-400">1 / 5</span>
+        </div>
+      </div>
+
+      <!-- Fluid Multi-segment or Solid Progress Bar -->
+      <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden mb-5 border border-slate-800">
+        <div id="quizProgressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full w-0 transition-all duration-300 ease-out"></div>
+      </div>
+
+      <!-- Question Card Container -->
+      <div id="quizCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl flex-1 flex flex-col justify-between">
+        <div>
+          <!-- Type and Hint Row -->
+          <div class="flex items-center justify-between mb-3 text-xs">
+            <span id="quizQuestionTypeBadge" class="text-[11px] uppercase font-black text-indigo-400 tracking-wider">
+              Single Choice
+            </span>
+            <span class="text-slate-400 text-[11px]" id="quizSelectionHint">Select 1 answer</span>
+          </div>
+
+          <!-- Question Prompt -->
+          <h3 id="quizQuestionText" class="text-lg sm:text-xl font-bold text-white leading-relaxed mb-6">
+            Loading prompt...
+          </h3>
+
+          <!-- Options Container (Filled dynamically with large touch targets) -->
+          <div id="quizOptionsContainer" class="space-y-3">
+            <!-- Dynamic Choice Cards -->
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-800/80">
+          <!-- Feedback block (Reveals upon submitting) -->
+          <div id="quizFeedbackBox" class="hidden mb-4 p-4 rounded-xl text-sm border animate-pop">
+            <div class="flex items-start gap-2.5">
+              <div id="feedbackIconWrapper" class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                <!-- Injected Lucide Icon -->
+              </div>
+              <div class="flex-1">
+                <h4 id="feedbackTitle" class="font-bold text-sm mb-1">Feedback Title</h4>
+                <p id="feedbackText" class="text-xs sm:text-sm leading-relaxed text-slate-300"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual-State Action Button: Submit -> Next Question -->
+          <button 
+            id="btnQuizAction" 
+            disabled 
+            class="w-full touch-target bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-500 active:scale-[0.98] text-white font-extrabold text-base py-3.5 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+          >
+            <span>Check Answer</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="viewCreator" class="hidden flex-1 flex flex-col space-y-6 animate-pop">
+      <!-- Section Header -->
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-white">Quiz Studio</h2>
+          <p class="text-xs text-slate-400">Add cards manually or bulk sync using CSV</p>
+        </div>
+        <button id="btnExportCSV" class="touch-target px-3.5 py-2 bg-slate-900 border border-slate-700/80 hover:border-emerald-500 text-emerald-400 font-bold text-xs rounded-xl flex items-center gap-1.5 transition active:scale-95">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Export CSV</span>
+        </button>
+      </div>
+
+      <!-- Quick CSV Dropzone / Tap Zone -->
+      <div 
+        id="csvDropZone" 
+        class="border-2 border-dashed border-slate-700 hover:border-indigo-500 bg-slate-900/60 rounded-2xl p-5 text-center transition cursor-pointer flex flex-col items-center justify-center gap-2 group"
+      >
+        <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+        <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:scale-110 transition flex items-center justify-center">
+          <i data-lucide="file-up" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="text-xs sm:text-sm font-bold text-slate-200">Tap to upload CSV or drag and drop</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">Supports: type,question,options,correct,box,explanation</p>
+        </div>
+      </div>
+
+      <!-- Manual Card Creation Form -->
+      <form id="formCreateCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i>
+          <span>Create New Flash Card</span>
+        </h3>
+
+        <!-- Question Type Toggle -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Question Layout Type</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer touch-target flex items-center justify-center gap-2 border border-slate-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600/20 bg-slate-950 rounded-xl px-3 py-2 text-xs font-semibold transition">
+              <input type="radio" name="creatorType" value="single" checked class="hidden" />
+              <span>Single Choice</span>
+            </label>
+            <label class="cursor-pointer touch-target flex items-center justify-center gap-2 border border-slate-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600/20 bg-slate-950 rounded-xl px-3 py-2 text-xs font-semibold transition">
+              <input type="radio" name="creatorType" value="multiple" class="hidden" />
+              <span>Multiple Choice</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Question Prompt -->
+        <div>
+          <label for="createQuestion" class="block text-xs font-semibold text-slate-300 mb-1">Question Prompt</label>
+          <textarea 
+            id="createQuestion" 
+            rows="2" 
+            required 
+            placeholder="e.g. Which layer of the OSI model handles end-to-end transport?"
+            class="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl p-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
+          ></textarea>
+        </div>
+
+        <!-- Options (Pipe Separated) -->
+        <div>
+          <label for="createOptions" class="block text-xs font-semibold text-slate-300 mb-1">
+            Choices (pipe-separated <code class="text-indigo-400">|</code>)
+          </label>
+          <input 
+            id="createOptions" 
+            type="text" 
+            required 
+            placeholder="Network Layer | Transport Layer | Session Layer" 
+            class="w-full touch-target bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
+          />
+        </div>
+
+        <!-- Correct Option(s) -->
+        <div>
+          <label for="createCorrect" class="block text-xs font-semibold text-slate-300 mb-1">
+            Correct Answer(s) (must match option text; pipe-separate if multiple)
+          </label>
+          <input 
+            id="createCorrect" 
+            type="text" 
+            required 
+            placeholder="Transport Layer" 
+            class="w-full touch-target bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
+          />
+        </div>
+
+        <!-- Optional Explanation / Notes -->
+        <div>
+          <label for="createExplanation" class="block text-xs font-semibold text-slate-300 mb-1">
+            Learning Note / Explanation <span class="text-slate-500 font-normal">(Optional)</span>
+          </label>
+          <textarea 
+            id="createExplanation" 
+            rows="2" 
+            placeholder="Optional detailed context that explains why this is correct..."
+            class="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl p-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
+          ></textarea>
+        </div>
+
+        <button 
+          type="submit" 
+          class="w-full touch-target bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-sm py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2"
+        >
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>Save Card to Pool</span>
+        </button>
+      </form>
+    </section>
+
+    <section id="viewResults" class="hidden flex-1 flex flex-col justify-center items-center text-center space-y-6 animate-pop py-6">
+      <div class="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-500 to-emerald-400 p-0.5 shadow-2xl shadow-emerald-500/20">
+        <div class="w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center text-emerald-400">
+          <i data-lucide="award" class="w-10 h-10"></i>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="text-2xl sm:text-3xl font-black text-white">Sprint Completed!</h2>
+        <p class="text-xs sm:text-sm text-slate-400 mt-1">Cards have adapted based on your answers.</p>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-3 gap-3 w-full">
+        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl">
+          <span class="text-xs font-semibold text-slate-400 block">Total</span>
+          <span id="resultsStatTotal" class="text-xl font-black text-white">5</span>
+        </div>
+        <div class="bg-slate-900 border border-emerald-500/20 p-3.5 rounded-xl">
+          <span class="text-xs font-semibold text-emerald-400 block">Correct</span>
+          <span id="resultsStatCorrect" class="text-xl font-black text-emerald-400">4</span>
+        </div>
+        <div class="bg-slate-900 border border-rose-500/20 p-3.5 rounded-xl">
+          <span class="text-xs font-semibold text-rose-400 block">Missed</span>
+          <span id="resultsStatMissed" class="text-xl font-black text-rose-400">1</span>
+        </div>
+      </div>
+
+      <!-- Return Button -->
+      <div class="w-full space-y-2 pt-2">
+        <button id="btnReturnDashboard" class="w-full touch-target bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-extrabold text-sm py-3.5 rounded-xl shadow-lg transition">
+          Return to Dashboard
+        </button>
+        <button id="btnRepeatSession" class="w-full touch-target bg-slate-900 border border-slate-700/80 hover:bg-slate-800 active:scale-[0.98] text-slate-300 font-semibold text-xs py-3 rounded-xl transition">
+          Review Another Batch
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 py-1.5 px-4 sm:hidden">
+    <div class="max-w-md mx-auto grid grid-cols-3 gap-1">
+      <button class="nav-tab active-tab flex flex-col items-center justify-center py-2 rounded-xl text-indigo-400 transition" data-target="viewDashboard">
+        <i data-lucide="layout-dashboard" class="w-5 h-5 mb-1"></i>
+        <span class="text-[10px] font-bold">Dashboard</span>
+      </button>
+
+      <button class="nav-tab flex flex-col items-center justify-center py-2 rounded-xl text-slate-400 hover:text-slate-200 transition" data-target="viewQuizTake">
+        <i data-lucide="play-circle" class="w-5 h-5 mb-1"></i>
+        <span class="text-[10px] font-bold">Quiz</span>
+      </button>
+
+      <button class="nav-tab flex flex-col items-center justify-center py-2 rounded-xl text-slate-400 hover:text-slate-200 transition" data-target="viewCreator">
+        <i data-lucide="folder-plus" class="w-5 h-5 mb-1"></i>
+        <span class="text-[10px] font-bold">Studio</span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="hidden sm:block fixed top-3 right-28 z-50">
+    <div class="flex items-center gap-1 bg-slate-800/90 border border-slate-700/60 p-1 rounded-xl">
+      <button class="nav-tab desktop-nav-tab px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-400 bg-slate-900/80 shadow-sm" data-target="viewDashboard">Dashboard</button>
+      <button class="nav-tab desktop-nav-tab px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white" data-target="viewQuizTake">Quiz</button>
+      <button class="nav-tab desktop-nav-tab px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white" data-target="viewCreator">Studio</button>
+    </div>
+  </div>
+
+  <div id="docsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-pop">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="folder-git-2" class="w-5 h-5 text-indigo-400"></i>
+          <h3 class="font-bold text-sm text-white">Repository Files & CSV Schema</h3>
+        </div>
+        <button id="btnCloseDocs" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 text-xs text-slate-300 custom-scrollbar">
+        <div>
+          <h4 class="font-bold text-indigo-300 text-sm mb-1">GitHub Pages Deployment</h4>
+          <p class="leading-relaxed">This application runs 100% client-side with zero external build tools required. Commit these files directly to the root of your GitHub repository and enable GitHub Pages under Settings &gt; Pages.</p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-emerald-400 text-sm mb-1">CSV Format Specification</h4>
+          <p class="mb-2">The CSV file must match this standard format:</p>
+          <pre class="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-[11px] overflow-x-auto text-slate-300">type,question,options,correct,box,explanation
+single,"Capital of France?","Paris|Lyon|Marseille","Paris",1,"Paris is the capital and largest city."
+multiple,"Select prime numbers:","2|3|4|9","2|3",1,"2 and 3 have only two positive factors."</pre>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-amber-400 text-sm mb-1">Adaptive Leitner Weight Formula</h4>
+          <ul class="list-disc list-inside space-y-1 text-slate-400">
+            <li><strong>Box 1:</strong> Weight multiplier <strong>4.0</strong> (Maximum priority review)</li>
+            <li><strong>Box 2:</strong> Weight multiplier <strong>2.0</strong> (Intermediate review)</li>
+            <li><strong>Box 3+:</strong> Weight multiplier <strong>1.0</strong> (Proficient cards)</li>
+            <li><strong>Correct Answer:</strong> Promotes item <code class="text-emerald-400">+1 box</code> (up to Box 5).</li>
+            <li><strong>Incorrect Answer:</strong> Immediately resets item to <code class="text-rose-400">Box 1</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State Store
+    const STORAGE_KEY = 'GIZMO_ADAPTIVE_DECK_V1';
+    let audioMuted = false;
+
+    // Default Seed Data
+    const DEFAULT_DECK = [
+      {
+        id: 'c1',
+        type: 'single',
+        question: 'Which HTTP status code signifies a resource was successfully created on the server?',
+        options: ['200 OK', '201 Created', '204 No Content', '301 Moved Permanently'],
+        correct: ['201 Created'],
+        box: 1,
+        explanation: 'HTTP 201 Created is the standard RESTful status response indicating that one or more new resources have been successfully generated.'
+      },
+      {
+        id: 'c2',
+        type: 'multiple',
+        question: 'Which of the following are primitive data types in JavaScript?',
+        options: ['String', 'Symbol', 'Array', 'BigInt'],
+        correct: ['String', 'Symbol', 'BigInt'],
+        box: 1,
+        explanation: 'Arrays and Objects are structural reference types; String, Symbol, and BigInt are primitive data types.'
+      },
+      {
+        id: 'c3',
+        type: 'single',
+        question: 'In computer science, what is the average time complexity of a hash table lookup?',
+        options: ['O(1)', 'O(log n)', 'O(n)', 'O(n^2)'],
+        correct: ['O(1)'],
+        box: 2,
+        explanation: 'Under uniform hashing conditions, key lookups in a hash table operate in O(1) amortized constant time.'
+      },
+      {
+        id: 'c4',
+        type: 'single',
+        question: 'Which CSS property creates a new stacking context without altering opacity?',
+        options: ['z-index: 10', 'transform: translateZ(0)', 'display: flex', 'overflow: hidden'],
+        correct: ['transform: translateZ(0)'],
+        box: 2,
+        explanation: 'CSS 3D transforms create an isolated hardware-accelerated stacking context on the rendering tree.'
+      },
+      {
+        id: 'c5',
+        type: 'multiple',
+        question: 'Which protocols run directly on top of the Transport Layer (TCP/UDP)?',
+        options: ['DNS', 'HTTP/3', 'IPsec', 'TLS'],
+        correct: ['DNS', 'HTTP/3', 'TLS'],
+        box: 3,
+        explanation: 'DNS uses UDP/TCP, HTTP/3 utilizes QUIC over UDP, and TLS sits on TCP. IPsec operates at the Network Layer (Layer 3).'
+      }
+    ];
+
+    let questionPool = [];
+    let currentSession = {
+      queue: [],
+      currentIndex: 0,
+      selectedOptions: [],
+      correctCount: 0,
+      missedCount: 0,
+      isAnswerChecked: false
+    };
+
+    let synth = null;
+    function playChime(isCorrect) {
+      if (audioMuted) return;
+      try {
+        if (!synth) {
+          synth = new Tone.PolySynth(Tone.Synth).toDestination();
+          synth.volume.value = -12;
+        }
+        if (Tone.context.state !== 'running') {
+          Tone.start();
+        }
+        if (isCorrect) {
+          synth.triggerAttackRelease(['C5', 'E5', 'G5'], '0.15');
+        } else {
+          synth.triggerAttackRelease(['D3', 'C#3'], '0.25');
+        }
+      } catch (e) {
+        // Audio policy fallback
+      }
+    }
+
+    function loadDeck() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          questionPool = JSON.parse(stored);
+        } catch (e) {
+          questionPool = [...DEFAULT_DECK];
+        }
+      } else {
+        questionPool = [...DEFAULT_DECK];
+        saveDeck();
+      }
+      updateDashboardUI();
+    }
+
+    function saveDeck() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(questionPool));
+    }
+
+    function generateAdaptiveQueue(targetSize) {
+      if (!questionPool.length) return [];
+      
+      // Calculate weights: Box 1 -> 4.0, Box 2 -> 2.0, Box 3+ -> 1.0
+      const getWeight = (b) => {
+        if (b <= 1) return 4.0;
+        if (b === 2) return 2.0;
+        return 1.0;
+      };
+
+      const poolCopy = [...questionPool];
+      const selected = [];
+      const sessionCount = Math.min(targetSize, poolCopy.length);
+
+      for (let i = 0; i < sessionCount; i++) {
+        let totalWeight = poolCopy.reduce((sum, item) => sum + getWeight(item.box || 1), 0);
+        let randomVal = Math.random() * totalWeight;
+        let cumulative = 0;
+        let chosenIndex = 0;
+
+        for (let j = 0; j < poolCopy.length; j++) {
+          cumulative += getWeight(poolCopy[j].box || 1);
+          if (randomVal <= cumulative) {
+            chosenIndex = j;
+            break;
+          }
+        }
+
+        selected.push(poolCopy[chosenIndex]);
+        poolCopy.splice(chosenIndex, 1);
+      }
+
+      return selected;
+    }
+
+    function showView(viewId) {
+      ['viewDashboard', 'viewQuizTake', 'viewCreator', 'viewResults'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      const activeEl = document.getElementById(viewId);
+      if (activeEl) activeEl.classList.remove('hidden');
+
+      // Update Nav Bars
+      document.querySelectorAll('.nav-tab').forEach(tab => {
+        const isMatch = tab.dataset.target === viewId;
+        if (tab.classList.contains('desktop-nav-tab')) {
+          if (isMatch) {
+            tab.className = "nav-tab desktop-nav-tab px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-400 bg-slate-900/80 shadow-sm";
+          } else {
+            tab.className = "nav-tab desktop-nav-tab px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white";
+          }
+        } else {
+          if (isMatch) {
+            tab.className = "nav-tab active-tab flex flex-col items-center justify-center py-2 rounded-xl text-indigo-400 transition";
+          } else {
+            tab.className = "nav-tab flex flex-col items-center justify-center py-2 rounded-xl text-slate-400 hover:text-slate-200 transition";
+          }
+        }
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function updateDashboardUI() {
+      const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      questionPool.forEach(card => {
+        const b = Math.min(Math.max(card.box || 1, 1), 5);
+        counts[b] = (counts[b] || 0) + 1;
+      });
+
+      document.getElementById('dashTotalCards').innerText = questionPool.length;
+      document.getElementById('tierCount1').innerText = counts[1];
+      document.getElementById('tierCount2').innerText = counts[2];
+      document.getElementById('tierCount3').innerText = counts[3];
+      document.getElementById('tierCount4').innerText = counts[4];
+      document.getElementById('tierCount5').innerText = counts[5];
+
+      const masteredPercent = questionPool.length ? Math.round((counts[5] / questionPool.length) * 100) : 0;
+      document.getElementById('masteryRateLabel').innerText = `${masteredPercent}% Mastered`;
+    }
+
+    function startSession() {
+      const input = document.getElementById('inputSessionLength');
+      let count = parseInt(input.value, 10);
+      if (isNaN(count) || count < 1) count = 5;
+
+      const queue = generateAdaptiveQueue(count);
+      if (!queue.length) return;
+
+      currentSession = {
+        queue: queue,
+        currentIndex: 0,
+        selectedOptions: [],
+        correctCount: 0,
+        missedCount: 0,
+        isAnswerChecked: false
+      };
+
+      showView('viewQuizTake');
+      renderCurrentCard();
+    }
+
+    function renderCurrentCard() {
+      const { queue, currentIndex } = currentSession;
+      if (currentIndex >= queue.length) {
+        showResultsView();
+        return;
+      }
+
+      currentSession.isAnswerChecked = false;
+      currentSession.selectedOptions = [];
+
+      const card = queue[currentIndex];
+      const isMultiple = card.type === 'multiple';
+
+      // Update counters & progress
+      document.getElementById('quizCardCounter').innerText = `${currentIndex + 1} / ${queue.length}`;
+      document.getElementById('quizBadgeBox').innerText = `Box ${card.box || 1}`;
+      
+      const progressPercent = ((currentIndex) / queue.length) * 100;
+      document.getElementById('quizProgressBar').style.width = `${progressPercent}%`;
+
+      document.getElementById('quizQuestionTypeBadge').innerText = isMultiple ? 'Multiple Choice' : 'Single Choice';
+      document.getElementById('quizSelectionHint').innerText = isMultiple ? 'Select all that apply' : 'Select 1 answer';
+      document.getElementById('quizQuestionText').innerText = card.question;
+
+      // Hide feedback box
+      const feedbackBox = document.getElementById('quizFeedbackBox');
+      feedbackBox.classList.add('hidden');
+
+      // Reset CTA button
+      const btn = document.getElementById('btnQuizAction');
+      btn.disabled = true;
+      btn.innerHTML = `<span>Check Answer</span><i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+
+      // Render options
+      const container = document.getElementById('quizOptionsContainer');
+      container.innerHTML = '';
+
+      card.options.forEach((optText, idx) => {
+        const optionTile = document.createElement('div');
+        optionTile.className = `option-choice-tile touch-target flex items-center justify-between p-3.5 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/80 hover:bg-slate-800/80 cursor-pointer transition active:scale-[0.99] select-none`;
+        optionTile.dataset.value = optText;
+
+        const indicatorShape = isMultiple ? 'rounded-md' : 'rounded-full';
+        optionTile.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="indicator-box w-5 h-5 ${indicatorShape} border-2 border-slate-600 flex items-center justify-center shrink-0 transition">
+              <div class="dot w-2 h-2 ${indicatorShape} bg-indigo-500 scale-0 transition-transform"></div>
+            </div>
+            <span class="text-xs sm:text-sm font-semibold text-slate-200">${optText}</span>
+          </div>
+        `;
+
+        optionTile.addEventListener('click', () => handleOptionClick(optText, optionTile, isMultiple));
+        container.appendChild(optionTile);
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function handleOptionClick(val, tileElement, isMultiple) {
+      if (currentSession.isAnswerChecked) return;
+
+      if (!isMultiple) {
+        currentSession.selectedOptions = [val];
+        document.querySelectorAll('.option-choice-tile').forEach(t => {
+          t.classList.remove('border-indigo-500', 'bg-indigo-950/30');
+          t.querySelector('.dot').classList.remove('scale-100');
+          t.querySelector('.dot').classList.add('scale-0');
+        });
+        tileElement.classList.add('border-indigo-500', 'bg-indigo-950/30');
+        tileElement.querySelector('.dot').classList.remove('scale-0');
+        tileElement.querySelector('.dot').classList.add('scale-100');
+      } else {
+        const idx = currentSession.selectedOptions.indexOf(val);
+        if (idx > -1) {
+          currentSession.selectedOptions.splice(idx, 1);
+          tileElement.classList.remove('border-indigo-500', 'bg-indigo-950/30');
+          tileElement.querySelector('.dot').classList.remove('scale-100');
+          tileElement.querySelector('.dot').classList.add('scale-0');
+        } else {
+          currentSession.selectedOptions.push(val);
+          tileElement.classList.add('border-indigo-500', 'bg-indigo-950/30');
+          tileElement.querySelector('.dot').classList.remove('scale-0');
+          tileElement.querySelector('.dot').classList.add('scale-100');
+        }
+      }
+
+      document.getElementById('btnQuizAction').disabled = currentSession.selectedOptions.length === 0;
+    }
+
+    function checkAnswer() {
+      const { queue, currentIndex, selectedOptions } = currentSession;
+      const currentCard = queue[currentIndex];
+      const correctAnswers = currentCard.correct;
+
+      // Check array equality
+      const isCorrect = 
+        selectedOptions.length === correctAnswers.length &&
+        selectedOptions.every(v => correctAnswers.includes(v));
+
+      currentSession.isAnswerChecked = true;
+
+      // Mutate box state on question pool
+      const originalCardIndex = questionPool.findIndex(q => q.question === currentCard.question);
+      if (originalCardIndex !== -1) {
+        if (isCorrect) {
+          const newBox = Math.min((questionPool[originalCardIndex].box || 1) + 1, 5);
+          questionPool[originalCardIndex].box = newBox;
+        } else {
+          questionPool[originalCardIndex].box = 1; // Demote to box 1 immediately
+        }
+        saveDeck();
+        updateDashboardUI();
+      }
+
+      if (isCorrect) {
+        currentSession.correctCount++;
+        playChime(true);
+      } else {
+        currentSession.missedCount++;
+        playChime(false);
+      }
+
+      // Visual color-coding on options
+      document.querySelectorAll('.option-choice-tile').forEach(tile => {
+        const val = tile.dataset.value;
+        const isRightOption = correctAnswers.includes(val);
+        const wasSelected = selectedOptions.includes(val);
+
+        if (isRightOption) {
+          tile.classList.add('border-emerald-500', 'bg-emerald-950/40', 'text-emerald-300');
+        } else if (wasSelected && !isRightOption) {
+          tile.classList.add('border-rose-500', 'bg-rose-950/40', 'text-rose-300');
+        }
+      });
+
+      // Feedback Box with Smart Fallback
+      const feedbackBox = document.getElementById('quizFeedbackBox');
+      const feedbackTitle = document.getElementById('feedbackTitle');
+      const feedbackText = document.getElementById('feedbackText');
+      const iconWrapper = document.getElementById('feedbackIconWrapper');
+
+      feedbackBox.classList.remove('hidden');
+
+      if (isCorrect) {
+        feedbackBox.className = 'mb-4 p-4 rounded-xl text-sm border bg-emerald-950/40 border-emerald-500/50 text-emerald-200 animate-pop';
+        feedbackTitle.innerText = 'Correct! Outstanding recall.';
+        iconWrapper.className = 'w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5';
+        iconWrapper.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4"></i>';
+
+        // Custom explanation or smart fallback
+        feedbackText.innerText = currentCard.explanation && currentCard.explanation.trim() !== ''
+          ? currentCard.explanation
+          : 'You answered accurately. This card has advanced to the next Leitner review tier!';
+      } else {
+        feedbackBox.className = 'mb-4 p-4 rounded-xl text-sm border bg-rose-950/40 border-rose-500/50 text-rose-200 animate-pop';
+        feedbackTitle.innerText = 'Needs Review';
+        iconWrapper.className = 'w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5';
+        iconWrapper.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4"></i>';
+
+        const correctStr = correctAnswers.join(', ');
+        feedbackText.innerText = currentCard.explanation && currentCard.explanation.trim() !== ''
+          ? currentCard.explanation
+          : `The right answer was: "${correctStr}". This card has returned to Box 1 for reinforcement.`;
+      }
+
+      // Morph button to "Next Question"
+      const btn = document.getElementById('btnQuizAction');
+      btn.disabled = false;
+      btn.className = "w-full touch-target bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-extrabold text-base py-3.5 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-2";
+      btn.innerHTML = `<span>Next Question</span><i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function advanceQuiz() {
+      currentSession.currentIndex++;
+      renderCurrentCard();
+    }
+
+    function showResultsView() {
+      document.getElementById('quizProgressBar').style.width = '100%';
+      document.getElementById('resultsStatTotal').innerText = currentSession.queue.length;
+      document.getElementById('resultsStatCorrect').innerText = currentSession.correctCount;
+      document.getElementById('resultsStatMissed').innerText = currentSession.missedCount;
+      showView('viewResults');
+    }
+
+    function exportToCSV() {
+      const headers = ['type', 'question', 'options', 'correct', 'box', 'explanation'];
+      const rows = questionPool.map(q => {
+        const escapeCSV = (str) => `"${(str || '').replace(/"/g, '""')}"`;
+        return [
+          q.type || 'single',
+          escapeCSV(q.question),
+          escapeCSV(q.options.join('|')),
+          escapeCSV(q.correct.join('|')),
+          q.box || 1,
+          escapeCSV(q.explanation || '')
+        ].join(',');
+      });
+
+      const csvContent = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `gizmo_quiz_deck_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function parseCSV(text) {
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length < 2) return;
+
+      // Handle simple CSV parsing with quotes
+      const parseLine = (line) => {
+        const result = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"' && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(cur.trim());
+            cur = '';
+          } else {
+            cur += char;
+          }
+        }
+        result.push(cur.trim());
+        return result;
+      };
+
+      const newCards = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseLine(lines[i]);
+        if (cols.length >= 4) {
+          const type = (cols[0] || 'single').toLowerCase().includes('multi') ? 'multiple' : 'single';
+          const question = cols[1];
+          const options = (cols[2] || '').split('|').map(s => s.trim()).filter(Boolean);
+          const correct = (cols[3] || '').split('|').map(s => s.trim()).filter(Boolean);
+          const box = parseInt(cols[4], 10) || 1;
+          const explanation = cols[5] || '';
+
+          if (question && options.length && correct.length) {
+            newCards.push({
+              id: 'c_' + Math.random().toString(36).substr(2, 9),
+              type,
+              question,
+              options,
+              correct,
+              box,
+              explanation
+            });
+          }
+        }
+      }
+
+      if (newCards.length) {
+        questionPool = [...questionPool, ...newCards];
+        saveDeck();
+        updateDashboardUI();
+        showView('viewDashboard');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadDeck();
+
+      // Navigation tab clicking
+      document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          showView(tab.dataset.target);
+        });
+      });
+
+      // Quick length buttons on dashboard
+      document.querySelectorAll('.btn-preset-len').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const len = e.currentTarget.dataset.len;
+          document.getElementById('inputSessionLength').value = len === 'All' ? questionPool.length : len;
+        });
+      });
+
+      // Start Session button
+      document.getElementById('btnStartSession').addEventListener('click', startSession);
+
+      // Quiz action button (Check or Next)
+      document.getElementById('btnQuizAction').addEventListener('click', () => {
+        if (!currentSession.isAnswerChecked) {
+          checkAnswer();
+        } else {
+          advanceQuiz();
+        }
+      });
+
+      // Exit button
+      document.getElementById('btnExitSession').addEventListener('click', () => {
+        showView('viewDashboard');
+      });
+
+      // Results buttons
+      document.getElementById('btnReturnDashboard').addEventListener('click', () => {
+        showView('viewDashboard');
+      });
+      document.getElementById('btnRepeatSession').addEventListener('click', startSession);
+
+      // Manual card creation
+      document.getElementById('formCreateCard').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const type = document.querySelector('input[name="creatorType"]:checked').value;
+        const question = document.getElementById('createQuestion').value.trim();
+        const rawOptions = document.getElementById('createOptions').value.trim();
+        const rawCorrect = document.getElementById('createCorrect').value.trim();
+        const explanation = document.getElementById('createExplanation').value.trim();
+
+        const options = rawOptions.split('|').map(s => s.trim()).filter(Boolean);
+        const correct = rawCorrect.split('|').map(s => s.trim()).filter(Boolean);
+
+        if (!question || options.length < 2 || !correct.length) {
+          return;
+        }
+
+        questionPool.push({
+          id: 'c_' + Math.random().toString(36).substr(2, 9),
+          type,
+          question,
+          options,
+          correct,
+          box: 1,
+          explanation
+        });
+
+        saveDeck();
+        updateDashboardUI();
+        e.target.reset();
+        showView('viewDashboard');
+      });
+
+      // CSV Export
+      document.getElementById('btnExportCSV').addEventListener('click', exportToCSV);
+
+      // CSV Import Dropzone
+      const dropZone = document.getElementById('csvDropZone');
+      const fileInput = document.getElementById('csvFileInput');
+
+      dropZone.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => parseCSV(event.target.result);
+          reader.readAsText(file);
+        }
+      });
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-indigo-400');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-indigo-400');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-indigo-400');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => parseCSV(event.target.result);
+          reader.readAsText(file);
+        }
+      });
+
+      // Docs modal
+      document.getElementById('btnDocsModal').addEventListener('click', () => {
+        document.getElementById('docsModal').classList.remove('hidden');
+      });
+      document.getElementById('btnCloseDocs').addEventListener('click', () => {
+        document.getElementById('docsModal').classList.add('hidden');
+      });
+
+      // Audio toggle
+      const btnAudio = document.getElementById('btnAudioToggle');
+      btnAudio.addEventListener('click', () => {
+        audioMuted = !audioMuted;
+        btnAudio.innerHTML = audioMuted 
+          ? '<i data-lucide="volume-x" class="w-4 h-4 text-rose-400"></i>'
+          : '<i data-lucide="volume-2" class="w-4 h-4 text-slate-200"></i>';
+        if (window.lucide) lucide.createIcons();
+      });
+
+      if (window.lucide) lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
